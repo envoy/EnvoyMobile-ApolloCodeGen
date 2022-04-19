@@ -7,7 +7,7 @@ struct GraphQLTool: AsyncParsableCommand {
             abstract: """
         A swift-based utility for performing Apollo-related tasks.
         
-        NOTE: If running from a compiled binary, prefix subcommands with `graph-ql-tool`. Otherwise use `swift run ApolloCodegen [subcommand]`.
+        NOTE: If running from a compiled binary, prefix subcommands with `gql`. Otherwise use `swift run ApolloCodegen [subcommand]`.
         """,
             subcommands: [DownloadSchema.self, GenerateCode.self, DownloadSchemaAndGenerateCode.self])
     

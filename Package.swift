@@ -1,15 +1,15 @@
-// swift-tools-version:5.6
+// swift-tools-version:5.5
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let package = Package(
-    name: "ApolloCodegen",
+    name: "GraphQLTool",
     platforms: [
         .macOS(.v12)
     ],
     products: [
-        .executable(name: "ApolloCodegen", targets: ["ApolloCodegen"])
+        .executable(name: "gql", targets: ["ApolloCodegen"])
     ],
     dependencies: [
         // The actual Apollo library
