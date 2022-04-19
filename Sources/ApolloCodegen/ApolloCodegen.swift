@@ -2,46 +2,51 @@ import Foundation
 import ApolloCodegenLib
 import ArgumentParser
 
-// An outer structure to hold all commands and sub-commands handled by this script.
-struct SwiftScript: ParsableCommand {
-
+struct GraphQLTool: AsyncParsableCommand {
     static var configuration = CommandConfiguration(
             abstract: """
         A swift-based utility for performing Apollo-related tasks.
         
-        NOTE: If running from a compiled binary, prefix subcommands with `swift-script`. Otherwise use `swift run ApolloCodegen [subcommand]`.
+        NOTE: If running from a compiled binary, prefix subcommands with `graph-ql-tool`. Otherwise use `swift run ApolloCodegen [subcommand]`.
         """,
             subcommands: [DownloadSchema.self, GenerateCode.self, DownloadSchemaAndGenerateCode.self])
     
     /// The sub-command to download a schema from a provided endpoint.
-    struct DownloadSchema: ParsableCommand {
+    struct DownloadSchema: AsyncParsableCommand {
         static var configuration = CommandConfiguration(
-            commandName: "downloadSchema",
-            abstract: "Downloads the schema with the settings you've set up in the `DownloadSchema` command in `main.swift`.")
+            commandName: "download-schema",
+            abstract: "Downloads the GraphQL schema"
+        )
+
+        @Argument(help: "the environment to fetch the schema from") var environment: Environment
+        @Option(name: .shortAndLong, parsing: .next, help: "valid envoy username") var username: String
+        @Option(name: .shortAndLong, parsing: .next, help: "valid envoy password") var password: String
         
-        func run() throws {
+        func run() async throws {
             let fileStructure = try FileStructure()
             CodegenLogger.log("File structure: \(fileStructure)")
-            
-            // Set up the URL you want to use to download the project
-            // TODO: Replace the placeholder with the GraphQL endpoint you're using to download the schema.
-            let endpoint = URL(string: "http://localhost:8080/graphql")!
-            
-            
-            // Calculate where you want to create the folder where the schema will be downloaded by the ApolloCodegenLib framework.
-            // TODO: Replace the placeholder with the name of the actual folder where you want the downloaded schema saved. The default is set up to put it in your project's root.
+
             let folderForDownloadedSchema = fileStructure.sourceRootURL
-                .apollo.childFolderURL(folderName: "MyProject")
+                            .apollo.childFolderURL(folderName: "EnvoyMobile")
+                            .apollo.childFolderURL(folderName: "Modules")
+                            .apollo.childFolderURL(folderName: "GraphQL")
             
+            print("[DEBUG] - schema path: \(folderForDownloadedSchema.path)")
+
             // Make sure the folder is created before trying to download something to it.
             try FileManager.default.apollo.createFolderIfNeeded(at: folderForDownloadedSchema)
+
+            let jwtToken = try await AuthenticationService().getJWT(for: environment, username: username, password: password)
             
-            // Create a configuration object for downloading the schema. Provided code will download the schema via an introspection query to the provided URL as SDL (GraphQL Schema Definition Language) to a file called "schema.graphqls". For all configuration parameters check out https://www.apollographql.com/docs/ios/api/ApolloCodegenLib/structs/ApolloSchemaDownloadConfiguration/
-            let schemaDownloadOptions = ApolloSchemaDownloadConfiguration(using: .introspection(endpointURL: endpoint),
-                                                                          outputFolderURL: folderForDownloadedSchema)
-            
-            // Actually attempt to download the schema.
-            try ApolloSchemaDownloader.fetch(with: schemaDownloadOptions)
+            let graphQLUrl = environment.url.appendingPathComponent("graphql")
+
+            let apolloConfiguration = ApolloSchemaDownloadConfiguration(
+                using: .introspection(endpointURL: graphQLUrl),
+                headers: [.init(key: "Authorization", value: "Bearer \(jwtToken)")],
+                outputFolderURL: folderForDownloadedSchema
+            )
+
+            try ApolloSchemaDownloader.fetch(with: apolloConfiguration)
         }
     }
     
@@ -56,9 +61,10 @@ struct SwiftScript: ParsableCommand {
             CodegenLogger.log("File structure: \(fileStructure)")
             
             // Get the root of the target for which you want to generate code.
-            // TODO: Replace the placeholder here with the name of of the folder containing your project's code files.
             let targetRootURL = fileStructure.sourceRootURL
-                .apollo.childFolderURL(folderName: "MyProject")
+                .apollo.childFolderURL(folderName: "EnvoyMobile")
+                .apollo.childFolderURL(folderName: "Modules")
+                .apollo.childFolderURL(folderName: "GraphQL")
             
             // Make sure the folder exists before trying to generate code.
             try FileManager.default.apollo.createFolderIfNeeded(at: targetRootURL)
@@ -76,17 +82,21 @@ struct SwiftScript: ParsableCommand {
     /// A sub-command which lets you download the schema then generate swift code.
     ///
     /// NOTE: This will both take significantly longer than code generation alone and fail when you're offline, so this is not recommended for use in a Run Phase Build script that runs with every build of your project.
-    struct DownloadSchemaAndGenerateCode: ParsableCommand {
+    struct DownloadSchemaAndGenerateCode: AsyncParsableCommand {
         static var configuration = CommandConfiguration(
             commandName: "all",
             abstract: "Downloads the schema and generates swift code. NOTE: Not recommended for use as part of a Run Phase Build Script.")
 
-        func run() throws {
-            try DownloadSchema().run()
+        func run() async throws {
+            try await DownloadSchema().run()
             try GenerateCode().run()
         }
     }
 }
 
-// This will set up the command and parse the arguments when this executable is run.
-SwiftScript.main()
+@main
+struct MainApp {
+    static func main() async {
+        await GraphQLTool.main()
+    }
+}
