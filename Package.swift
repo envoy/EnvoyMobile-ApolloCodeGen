@@ -8,6 +8,9 @@ let package = Package(
     platforms: [
         .macOS(.v12)
     ],
+    products: [
+        .executable(name: "ApolloCodegen", targets: ["ApolloCodegen"])
+    ],
     dependencies: [
         // The actual Apollo library
         .package(url: "https://github.com/apollographql/apollo-ios.git",
